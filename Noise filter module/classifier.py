@@ -30,12 +30,31 @@ _SYSTEM_MAIL_PATTERNS = re.compile(
     re.IGNORECASE,
 )
 
-_CALENDAR_PATTERNS = re.compile(
-    r"(?:you have been invited|"
-    r"meeting request|"
-    r"calendar invitation|"
-    r"please join|"
-    r"\bdeadline\b|\bby (?:monday|tuesday|wednesday|thursday|friday|q[1-4])\b)",
+# Strict project deadline patterns
+_PROJECT_TIMELINE = re.compile(
+    r"(?:\bdeadline\b|"
+    r"\bmilestone\b|"
+    r"\bphase [1-9]\b|"
+    r"\bgo-live\b|"
+    r"\blaunch date\b|"
+    r"\bcode freeze\b|"
+    r"\bdeliverable\b)",
+    re.IGNORECASE,
+)
+
+# Pure meeting/scheduling noise
+_MEETING_SCHEDULING = re.compile(
+    r"(?:meeting\b|"
+    r"schedule\b|"
+    r"calendar\b|"
+    r"invite\b|"
+    r"room\b|"
+    r"dial-in\b|"
+    r"webex\b|"
+    r"zoom\b|"
+    r"lunch\b|"
+    r"\b(?:monday|tuesday|wednesday|thursday|friday)\b(?!\s+(?:deadline|launch))|" 
+    r"\bat \d{1,2}(?::\d{2})?\s*(?:am|pm)?\b)", # at 2pm
     re.IGNORECASE,
 )
 
@@ -54,32 +73,45 @@ _SOCIAL_NOISE = re.compile(
     re.IGNORECASE,
 )
 
-_MIN_WORD_COUNT = 5  # chunks shorter than this are noise
+_MIN_WORD_COUNT = 4  # Very short chunks are usually noise unless they contain keywords
 
 
 def apply_heuristics(chunk: dict) -> Optional[str]:
     """
     Fast-path rule-based classification.
-    Returns a label string if confident, or None to pass through to LLM.
+    Returns:
+      - "noise": if confident it's junk
+      - "timeline_reference": if confident it's a PROJECT deadline
+      - None: inconclusive, send to LLM
     """
     text = chunk.get("cleaned_text", "")
     speaker = chunk.get("speaker", "")
     word_count = len(text.split())
 
-    # Too short
-    if word_count < _MIN_WORD_COUNT:
-        return "noise"
-
     # System-generated mail
     if _SYSTEM_MAIL_PATTERNS.search(text) or _SYSTEM_MAIL_PATTERNS.search(speaker):
         return "noise"
 
-    # Pure social noise
-    if _SOCIAL_NOISE.match(text.strip()):
+    # Pure social noise (short & generic)
+    if word_count < 10 and _SOCIAL_NOISE.match(text.strip()):
+        return "noise"
+        
+    # Compound Discard Rule:
+    # If short (< 15 words) AND contains meeting/scheduling keywords -> Noise
+    # This catches "Let's meet Tuesday at 2pm" but allows "Tuesday deadline for phase 1"
+    if word_count < 15 and _MEETING_SCHEDULING.search(text):
+        # Double check it's NOT a project deadline
+        if not _PROJECT_TIMELINE.search(text):
+            return "noise"
+
+    # Ultra-short junk
+    if word_count < _MIN_WORD_COUNT:
         return "noise"
 
-    # Calendar / meeting invite → timeline reference
-    if _CALENDAR_PATTERNS.search(text):
+    # Calendar / meeting invite → NOISE (unless it has "deadline")
+    # Old logic mapped this to timeline. New logic maps pure scheduling to noise.
+    # We only auto-classify timeline if it matches _PROJECT_TIMELINE
+    if _PROJECT_TIMELINE.search(text):
         return "timeline_reference"
 
     return None  # inconclusive — send to LLM
