@@ -36,12 +36,12 @@ COPY . .
 
 # Expose the port the app runs on
 # Cloud Run uses the PORT environment variable, usually 8080
-EXPOSE 8080
+EXPOSE ${PORT}
 
 # Set environment variables
 ENV PYTHONUNBUFFERED=1
 ENV PYTHONDONTWRITEBYTECODE=1
-ENV PORT=8080
+ENV PORT=${PORT}
 
 # Command to run the application
 # Use the PORT environment variable provided by Cloud Run, falling back to 8080
