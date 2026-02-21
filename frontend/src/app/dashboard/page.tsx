@@ -190,7 +190,7 @@ export default function DashboardPage() {
             .then(res => {
                 const c: SignalCounts = { total: 0, requirement: 0, decision: 0, feedback: 0, timeline: 0, noise: 0, flags: 0 };
                 res.chunks.forEach(ch => {
-                    if (ch.is_noise) { c.noise++; return; }
+                    if (ch.suppressed) { c.noise++; return; }
                     c.total++;
                     const label = (ch.signal_label ?? '').toLowerCase();
                     if (label === 'requirement') c.requirement++;

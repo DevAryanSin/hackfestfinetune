@@ -6,6 +6,7 @@ import {
     Hash, Mail, Upload, CheckCircle2, AlertCircle, Database,
     Eye, RefreshCw, Trash2, FileText, File, Table2, X, Loader2
 } from 'lucide-react';
+import { cn } from '@/lib/utils';
 import Drawer from '@/components/ui/Drawer';
 import { uploadFile, ingestDemoDataset, getChunks, type Chunk } from '@/lib/apiClient';
 import { useSessionStore } from '@/store/useSessionStore';

@@ -39,7 +39,7 @@ const SECTION_META: { id: keyof BRDSections; title: string }[] = [
 
 function sectionsFromAPI(raw: BRDSections): BRDSection[] {
     return SECTION_META.map(({ id, title }) => ({
-        id,
+        id: id as string,
         title,
         content: raw[id] ?? '',
         citations: [],
@@ -47,7 +47,7 @@ function sectionsFromAPI(raw: BRDSections): BRDSection[] {
 }
 
 export const useBRDStore = create<BRDStore>((set, get) => ({
-    sections: SECTION_META.map(({ id, title }) => ({ id, title, content: '', citations: [] })),
+    sections: SECTION_META.map(({ id, title }) => ({ id: id as string, title, content: '', citations: [] })),
     flags: [],
     snapshotId: null,
     loading: false,
