@@ -6,9 +6,11 @@ Runs the full pipeline: parse Enron CSV → classify → print summary.
 
 from __future__ import annotations
 
+import hashlib
 import os
 import sys
 import time
+import uuid
 from collections import Counter
 from pathlib import Path
 
@@ -68,8 +70,9 @@ def print_pipeline_breakdown(classified):
                  if c.reasoning == "Classified by heuristic rule."]
     domain_gate = [c for c in classified 
                    if c.reasoning == "No project-relevant domain terms detected."]
-    llm_path = [c for c in classified 
-                if c not in heuristic and c not in domain_gate]
+    # Use id-based sets for O(1) membership instead of O(n) list scan
+    _seen = {id(c) for c in heuristic} | {id(c) for c in domain_gate}
+    llm_path = [c for c in classified if id(c) not in _seen]
     
     print("\n--- PIPELINE PATH BREAKDOWN ---")
     print(f"  Heuristic (fast path):     {len(heuristic):>4}")
@@ -112,7 +115,6 @@ def main():
     # -----------------------------------------------------------------------
     # Content-Level Deduplication
     # -----------------------------------------------------------------------
-    import hashlib
     seen_hashes = set()
     unique_chunks = []
     for c in chunks:
@@ -136,7 +138,7 @@ def main():
     print(f"  → Done. {len(classified)} chunks classified in {time.perf_counter() - _t_cls:.1f}s\n")
     
     # --- Integration Point for BRD Pipeline ---
-    import uuid
+
     
     print("\n--- Saving Chunks for BRD Pipeline ---")
     session_id = str(uuid.uuid4())

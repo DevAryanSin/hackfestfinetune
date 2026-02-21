@@ -187,7 +187,7 @@ def _classify_single_heuristic(item: tuple[int, dict]) -> tuple[int, dict, Optio
 
 def run_parallel_heuristics(chunks: list[dict]) -> tuple[dict[int, dict], list[tuple[int, dict]]]:
     """
-    Run heuristics on all chunks in parallel (8 threads — pure CPU/regex).
+    Run heuristics on all chunks (direct loop — pure CPU/regex, GIL-bound).
     Returns:
       - fast_results: {index → result_dict} for heuristic-decided chunks
       - llm_pending:  [(index, chunk), ...] for chunks needing LLM
@@ -195,26 +195,21 @@ def run_parallel_heuristics(chunks: list[dict]) -> tuple[dict[int, dict], list[t
     fast_results: dict[int, dict] = {}
     llm_pending: list[tuple[int, dict]] = []
 
-    with ThreadPoolExecutor(max_workers=8) as executor:
-        futures = {
-            executor.submit(_classify_single_heuristic, (i, chunk)): i
-            for i, chunk in enumerate(chunks)
-        }
-        for future in as_completed(futures):
-            idx, chunk, label, path = future.result()
-            if label is None:
-                llm_pending.append((idx, chunk))
-            else:
-                log_chunk_decision(chunk, path, label, 1.0,
-                                   "Classified by heuristic rule." if path == "HEURISTIC"
-                                   else "No project-relevant domain terms detected.")
-                fast_results[idx] = {
-                    "label": label,
-                    "confidence": 1.0,
-                    "reasoning": ("Classified by heuristic rule." if path == "HEURISTIC"
-                                  else "No project-relevant domain terms detected."),
-                    "flagged_for_review": False,
-                }
+    for i, chunk in enumerate(chunks):
+        idx, chunk, label, path = _classify_single_heuristic((i, chunk))
+        if label is None:
+            llm_pending.append((idx, chunk))
+        else:
+            log_chunk_decision(chunk, path, label, 1.0,
+                               "Classified by heuristic rule." if path == "HEURISTIC"
+                               else "No project-relevant domain terms detected.")
+            fast_results[idx] = {
+                "label": label,
+                "confidence": 1.0,
+                "reasoning": ("Classified by heuristic rule." if path == "HEURISTIC"
+                              else "No project-relevant domain terms detected."),
+                "flagged_for_review": False,
+            }
 
     return fast_results, llm_pending
 
@@ -334,10 +329,12 @@ def run_parallel_batches(
             }
             for future, batch in future_to_batch.items():
                 batch_result = future.result()
+                # O(1) lookup dict instead of O(n) linear scan per result
+                idx_to_chunk = {i: c for i, c in batch}
                 # Apply confidence thresholding
                 for idx, result in batch_result.items():
                     result = apply_confidence_threshold(result)
-                    chunk = next(c for i, c in batch if i == idx)
+                    chunk = idx_to_chunk[idx]
                     log_chunk_decision(chunk, "LLM_BATCH", result["label"],
                                        result["confidence"], result["reasoning"])
                     llm_results[idx] = result
