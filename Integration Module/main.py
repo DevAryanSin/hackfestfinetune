@@ -1,5 +1,7 @@
 import os
 import json
+from typing import List
+from pydantic import BaseModel
 from fastapi import FastAPI, Request, HTTPException
 from fastapi.responses import RedirectResponse
 from google_auth_oauthlib.flow import Flow
@@ -21,6 +23,13 @@ REDIRECT_URI = "http://localhost:8000/gmail/oauth_redirect"
 
 # In-memory storage for credentials (for demo purposes)
 user_credentials = {}
+
+class SelectedItemsRequest(BaseModel):
+    message_ids: List[str]
+
+class SlackSelectedItemsRequest(BaseModel):
+    channel_id: str
+    message_ids: List[str]
 
 @app.get("/")
 def read_root():
@@ -399,6 +408,107 @@ def gmail_extract_batch(count: int = 5):
             "files_downloaded_count": len(downloaded),
             "files": downloaded
         }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/gmail/process_selected")
+def gmail_process_selected(request: SelectedItemsRequest):
+    """
+    Process specific Gmail messages and their PDF attachments into chunks for the Noise Filter.
+    """
+    creds_data = user_credentials.get("main_user")
+    if not creds_data:
+        raise HTTPException(status_code=401, detail="User not authenticated. Go to /gmail/login")
+    
+    credentials = Credentials(**creds_data)
+    try:
+        service = gmail.get_gmail_service(credentials)
+        chunks = []
+        
+        for msg_id in request.message_ids:
+            email_data = gmail.get_email_details(service, msg_id)
+            
+            # 1. Add email body as a chunk
+            chunks.append({
+                "source_ref": msg_id,
+                "speaker": email_data["from"],
+                "raw_text": email_data["body"],
+                "cleaned_text": email_data["body"],
+                "subject": email_data["subject"]
+            })
+            
+            # 2. Add parsed PDFs as separate chunks
+            for att in email_data["attachments"]:
+                if att["filename"].lower().endswith(".pdf"):
+                    pdf_data = gmail.download_attachment(service, msg_id, att["attachment_id"])
+                    extracted_text = pdf.extract_text_from_pdf_bytes(pdf_data)
+                    if extracted_text:
+                        chunks.append({
+                            "source_ref": f"{msg_id}_{att['filename']}",
+                            "speaker": email_data["from"],
+                            "raw_text": f"PDF Attachment: {att['filename']}\n{extracted_text}",
+                            "cleaned_text": extracted_text,
+                            "subject": email_data["subject"]
+                        })
+                        
+        return {"count": len(chunks), "chunks": chunks}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/slack/process_selected")
+def slack_process_selected(request: SlackSelectedItemsRequest):
+    """
+    Process specific Slack messages and their PDF files into chunks for the Noise Filter.
+    """
+    creds_data = user_credentials.get("slack_user")
+    if not creds_data:
+        raise HTTPException(status_code=401, detail="Slack user not authenticated. Go to /slack/login")
+    
+    token = creds_data.get("access_token")
+    try:
+        # Fetch channel history to find the specific messages
+        messages = slack_auth.get_channel_messages(token, request.channel_id)
+        selected_msgs = [m for m in messages if m.get("ts") in request.message_ids]
+        
+        chunks = []
+        user_cache = {}
+        
+        for msg in selected_msgs:
+            user_id = msg.get("user")
+            if user_id and user_id not in user_cache:
+                user_info = slack_auth.get_user_info(token, user_id)
+                user_cache[user_id] = user_info.get("real_name", user_id) if user_info else user_id
+            
+            speaker = user_cache.get(user_id, user_id) if user_id else "Unknown"
+            
+            # 1. Add message text as a chunk
+            cleaned_text = slack_auth.strip_slack_formatting(msg.get("text", ""))
+            chunks.append({
+                "source_ref": msg["ts"],
+                "speaker": speaker,
+                "raw_text": msg.get("text", ""),
+                "cleaned_text": cleaned_text,
+                "subject": f"Slack Message in {request.channel_id}"
+            })
+            
+            # 2. Process files
+            if "files" in msg:
+                for f in msg["files"]:
+                    if f.get("filetype") == "pdf" or f.get("name", "").lower().endswith(".pdf"):
+                        pdf_url = f.get("url_private_download")
+                        if pdf_url:
+                            pdf_data = slack_auth.download_slack_file(token, pdf_url)
+                            extracted_text = pdf.extract_text_from_pdf_bytes(pdf_data)
+                            if extracted_text:
+                                chunks.append({
+                                    "source_ref": f"{msg['ts']}_{f.get('name')}",
+                                    "speaker": speaker,
+                                    "raw_text": f"Slack PDF File: {f.get('name')}\n{extracted_text}",
+                                    "cleaned_text": extracted_text,
+                                    "subject": f"Slack File in {request.channel_id}"
+                                })
+                                
+        return {"count": len(chunks), "chunks": chunks}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
