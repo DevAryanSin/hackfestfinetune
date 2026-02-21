@@ -1,5 +1,5 @@
 from fastapi import APIRouter, UploadFile, File, HTTPException
-from pdf import extract_text_from_pdf_bytes
+from pdf import extract_text_from_pdf_bytes, extract_text_from_docx_bytes
 
 router = APIRouter(
     prefix="/pdf",
@@ -9,9 +9,13 @@ router = APIRouter(
 @router.post("/parse")
 async def parse_document(file: UploadFile = File(...)):
     """
-    Takes a document (PDF or TXT) from the user and parses it using the integration module's logic.
+    Takes a document (PDF, TXT, or DOCX) from the user and parses it using the integration module's logic.
     """
-    allowed_types = ["application/pdf", "text/plain"]
+    allowed_types = [
+        "application/pdf", 
+        "text/plain",
+        "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+    ]
     if file.content_type not in allowed_types:
         raise HTTPException(status_code=400, detail=f"File must be one of: {', '.join(allowed_types)}")
     
@@ -22,6 +26,8 @@ async def parse_document(file: UploadFile = File(...)):
              
         if file.content_type == "application/pdf":
             parsed_text = extract_text_from_pdf_bytes(content_bytes)
+        elif file.content_type == "application/vnd.openxmlformats-officedocument.wordprocessingml.document":
+            parsed_text = extract_text_from_docx_bytes(content_bytes)
         else:
             # Handle plain text files
             try:
