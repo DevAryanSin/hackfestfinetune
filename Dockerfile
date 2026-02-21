@@ -54,7 +54,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 # Install pre-built wheels from the builder stage (no compiler needed)
 COPY --from=builder /build/wheels /tmp/wheels
 COPY requirements-full.txt .
-RUN pip install --no-cache-dir --no-index --find-links=/tmp/wheels -r requirements-full.txt \
+RUN pip install --no-cache-dir --find-links=/tmp/wheels -r requirements-full.txt \
     && rm -rf /tmp/wheels
 
 # ---------- Non-root user ----------
