@@ -376,7 +376,7 @@ def apply_confidence_threshold(result: dict) -> dict:
 # Main orchestrator
 # ---------------------------------------------------------------------------
 
-def classify_chunks(chunks: list[dict], api_key: str) -> list[ClassifiedChunk]:
+def classify_chunks(chunks: list[dict], api_key: str, log_fn=None) -> list[ClassifiedChunk]:
     """
     Two-phase parallel classification pipeline.
 
@@ -437,4 +437,3 @@ def classify_chunks(chunks: list[dict], api_key: str) -> list[ClassifiedChunk]:
         ))
 
     return classified
-
