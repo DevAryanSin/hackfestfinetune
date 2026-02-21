@@ -5094,3 +5094,76 @@ For more information check: https://developer.mozilla.org/en-US/docs/Web/HTTP/St
 2026-02-21 19:15:15,612 | HTTP Request: POST https://api.groq.com/openai/v1/chat/completions "200 OK"
 2026-02-21 19:15:15,686 | load_ssl_context verify=True cert=None trust_env=True http2=False
 2026-02-21 19:15:15,687 | load_verify_locations cafile='C:\\Users\\Kurian Jose\\anaconda3\\Lib\\site-packages\\certifi\\cacert.pem'
+2026-02-21 20:58:27,525 | Calling on_part_begin with no data
+2026-02-21 20:58:27,525 | Calling on_header_field with data[42:61]
+2026-02-21 20:58:27,525 | Calling on_header_value with data[63:106]
+2026-02-21 20:58:27,525 | Calling on_header_end with no data
+2026-02-21 20:58:27,525 | Calling on_header_field with data[108:120]
+2026-02-21 20:58:27,528 | Calling on_header_value with data[122:132]
+2026-02-21 20:58:27,528 | Calling on_header_end with no data
+2026-02-21 20:58:27,528 | Calling on_headers_finished with no data
+2026-02-21 20:58:27,528 | Calling on_part_end with no data
+2026-02-21 20:58:27,529 | Calling on_part_begin with no data
+2026-02-21 20:58:27,529 | Calling on_header_field with data[180:199]
+2026-02-21 20:58:27,529 | Calling on_header_value with data[201:230]
+2026-02-21 20:58:27,529 | Calling on_header_end with no data
+2026-02-21 20:58:27,529 | Calling on_headers_finished with no data
+2026-02-21 20:58:27,529 | Calling on_part_data with data[234:238]
+2026-02-21 20:58:27,529 | Calling on_part_end with no data
+2026-02-21 20:58:27,532 | Calling on_end with no data
+2026-02-21 21:00:00,609 | load_ssl_context verify=True cert=None trust_env=True http2=False
+2026-02-21 21:00:00,648 | load_verify_locations cafile='C:\\Users\\sandeep prajapati\\AppData\\Local\\Programs\\Python\\Python311\\Lib\\site-packages\\certifi\\cacert.pem'
+2026-02-21 21:07:48,297 | load_ssl_context verify=True cert=None trust_env=True http2=False
+2026-02-21 21:07:48,327 | load_verify_locations cafile='C:\\Users\\sandeep prajapati\\AppData\\Local\\Programs\\Python\\Python311\\Lib\\site-packages\\certifi\\cacert.pem'
+2026-02-21 21:08:01,230 | load_ssl_context verify=True cert=None trust_env=True http2=False
+2026-02-21 21:08:01,236 | load_verify_locations cafile='C:\\Users\\sandeep prajapati\\AppData\\Local\\Programs\\Python\\Python311\\Lib\\site-packages\\certifi\\cacert.pem'
+2026-02-21 21:08:03,986 | 
+============================================================
+PATH: DOMAIN_GATE
+SPEAKER: phillip.allen@enron.com
+SOURCE: allen-p/_sent_mail/1.
+TEXT: Here is our forecast
+LABEL: noise
+CONFIDENCE: 1.0
+REASONING: No signal nouns found
+============================================================
+2026-02-21 21:08:04,201 | 
+============================================================
+PATH: DOMAIN_GATE
+SPEAKER: phillip.allen@enron.com
+SOURCE: allen-p/_sent_mail/10.
+TEXT: Re: Traveling to have a business meeting takes the fun out of the trip. Especially if you have to prepare a presentation. I would suggest holding the 
+LABEL: noise
+CONFIDENCE: 1.0
+REASONING: No signal nouns found
+============================================================
+2026-02-21 21:08:04,403 | 
+============================================================
+PATH: DOMAIN_GATE
+SPEAKER: phillip.allen@enron.com
+SOURCE: allen-p/_sent_mail/100.
+TEXT: Re: test test successful. way to go!!!
+LABEL: noise
+CONFIDENCE: 1.0
+REASONING: No signal nouns found
+============================================================
+2026-02-21 21:08:04,604 | 
+============================================================
+PATH: HEURISTIC
+SPEAKER: phillip.allen@enron.com
+SOURCE: allen-p/_sent_mail/1000.
+TEXT: Randy, Can you send me a schedule of the salary and level of everyone in the scheduling group. Plus your thoughts on any changes that need to be made.
+LABEL: noise
+CONFIDENCE: 1.0
+REASONING: Heuristic rule matched
+============================================================
+2026-02-21 21:08:04,605 | 
+============================================================
+PATH: HEURISTIC
+SPEAKER: phillip.allen@enron.com
+SOURCE: allen-p/_sent_mail/1001.
+TEXT: Re: Hello Let's shoot for Tuesday at 11:45.
+LABEL: noise
+CONFIDENCE: 1.0
+REASONING: Heuristic rule matched
+============================================================

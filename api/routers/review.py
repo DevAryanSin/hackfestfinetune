@@ -15,10 +15,12 @@ router = APIRouter(
 @router.get("/")
 def get_session_chunks(session_id: str, status: str = "signal"):
     """
-    Retrieve chunks for a session with filtering options (?status=noise or ?status=signal).
+    Retrieve chunks for a session with filtering options (?status=noise, ?status=signal, or ?status=all).
     """
     if status == "noise":
         items = get_noise_items()
+    elif status == "all":
+        items = get_noise_items() + get_active_signals()
     else:
         items = get_active_signals()
         
