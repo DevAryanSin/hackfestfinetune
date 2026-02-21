@@ -1,9 +1,11 @@
 "use client";
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { Eye, EyeOff, RefreshCw, CheckCircle2, AlertCircle, Trash2, Edit2, Plus } from 'lucide-react';
+import { Eye, EyeOff, RefreshCw, CheckCircle2, AlertCircle, Trash2, Edit2, Plus, ArrowRight } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { useSessionStore } from '@/store/useSessionStore';
+import NewBRDModal from '@/components/ui/NewBRDModal';
 
 // ─── Card wrapper ─────────────────────────────────────────────────────────────
 
@@ -31,13 +33,6 @@ function FieldRow({ label, children }: { label: string; children: React.ReactNod
     );
 }
 
-// ─── Sessions ─────────────────────────────────────────────────────────────────
-
-const SESSIONS = [
-    { id: 'sess_02a9fe3c', name: 'Hackfest Demo Session', created: '21 Feb 2026', sources: 3, signals: 183, status: 'Active' },
-    { id: 'sess_01b7aa2d', name: 'Project Alpha Kickoff', created: '18 Feb 2026', sources: 2, signals: 94, status: 'Complete' },
-];
-
 // ─── Confidence band visual ───────────────────────────────────────────────────
 
 function ConfidenceDiagram({ accept, lower }: { accept: number; lower: number }) {
@@ -63,6 +58,9 @@ function ConfidenceDiagram({ accept, lower }: { accept: number; lower: number })
 // ─── Main Page ────────────────────────────────────────────────────────────────
 
 export default function SettingsPage() {
+    const { sessions, removeSession, updateSession, setActive } = useSessionStore();
+    const [hasHydrated, setHasHydrated] = useState(false);
+
     const [showKey, setShowKey] = useState(false);
     const [apiKey, setApiKey] = useState('gsk_xxxxxxxxxxxxxxxxxxxxxxxxxxxx');
     const [connTested, setConnTested] = useState<boolean | null>(null);
@@ -71,13 +69,32 @@ export default function SettingsPage() {
     const [batchSize, setBatchSize] = useState(10);
     const [accept, setAccept] = useState(0.75);
     const [lower, setLower] = useState(0.65);
+
     const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
     const [deleteName, setDeleteName] = useState('');
+
+    const [editingSession, setEditingSession] = useState<string | null>(null);
+    const [editName, setEditName] = useState('');
+    const [modalOpen, setModalOpen] = useState(false);
+
+    useEffect(() => {
+        setHasHydrated(true);
+    }, []);
 
     const testConnection = () => {
         setConnTested(null);
         setTimeout(() => setConnTested(true), 1200);
     };
+
+    const handleSaveRename = () => {
+        if (editingSession && editName.trim()) {
+            updateSession(editingSession, { name: editName.trim() });
+            setEditingSession(null);
+            setEditName('');
+        }
+    };
+
+    if (!hasHydrated) return null;
 
     return (
         <div className="p-6 space-y-5 max-w-3xl">
@@ -196,28 +213,51 @@ export default function SettingsPage() {
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-white/5">
-                            {SESSIONS.map(sess => (
+                            {sessions.map(sess => (
                                 <tr key={sess.id} className="hover:bg-white/3 transition-colors">
                                     <td className="px-2 py-3">
-                                        <div>
-                                            <p className="text-zinc-200 font-medium">{sess.name}</p>
-                                            <p className="text-zinc-600 font-mono text-[10px]">{sess.id}</p>
-                                        </div>
+                                        {editingSession === sess.id ? (
+                                            <div className="flex gap-2 items-center">
+                                                <input
+                                                    autoFocus
+                                                    value={editName}
+                                                    onChange={e => setEditName(e.target.value)}
+                                                    onKeyDown={e => e.key === 'Enter' && handleSaveRename()}
+                                                    className="glass-input px-2 py-1 text-xs w-full"
+                                                />
+                                                <button onClick={handleSaveRename} className="text-emerald-400 hover:text-emerald-300">Save</button>
+                                                <button onClick={() => setEditingSession(null)} className="text-zinc-500 hover:text-zinc-300">Esc</button>
+                                            </div>
+                                        ) : (
+                                            <div>
+                                                <p className="text-zinc-200 font-medium">{sess.name}</p>
+                                                <p className="text-zinc-600 font-mono text-[10px]">{sess.id}</p>
+                                            </div>
+                                        )}
                                     </td>
-                                    <td className="px-2 py-3 text-zinc-500">{sess.created}</td>
-                                    <td className="px-2 py-3 text-zinc-400 font-mono">{sess.sources}</td>
-                                    <td className="px-2 py-3 text-zinc-400 font-mono">{sess.signals}</td>
+                                    <td className="px-2 py-3 text-zinc-500">{new Date(sess.createdAt).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}</td>
+                                    <td className="px-2 py-3 text-zinc-400 font-mono">{sess.sections || 0}</td>
+                                    <td className="px-2 py-3 text-zinc-400 font-mono">{sess.signals || 0}</td>
                                     <td className="px-2 py-3">
-                                        <span className={cn('glass-badge', sess.status === 'Active' ? 'badge-timeline' : 'badge-noise')}>
+                                        <span className={cn('glass-badge',
+                                            sess.status === 'active' ? 'badge-timeline' :
+                                                sess.status === 'complete' ? 'badge-success' : 'badge-noise'
+                                        )}>
                                             {sess.status}
                                         </span>
                                     </td>
                                     <td className="px-2 py-3">
                                         <div className="flex items-center gap-1">
-                                            <button className="p-1.5 rounded text-zinc-600 hover:text-zinc-200 hover:bg-white/5 transition-colors" title="Open">
-                                                <Eye size={12} />
+                                            <button
+                                                onClick={() => setActive(sess.id)}
+                                                className="p-1.5 rounded text-zinc-600 hover:text-zinc-200 hover:bg-white/5 transition-colors" title="Activate"
+                                            >
+                                                <ArrowRight size={12} />
                                             </button>
-                                            <button className="p-1.5 rounded text-zinc-600 hover:text-zinc-200 hover:bg-white/5 transition-colors" title="Rename">
+                                            <button
+                                                onClick={() => { setEditingSession(sess.id); setEditName(sess.name); }}
+                                                className="p-1.5 rounded text-zinc-600 hover:text-zinc-200 hover:bg-white/5 transition-colors" title="Rename"
+                                            >
                                                 <Edit2 size={12} />
                                             </button>
                                             <button
@@ -243,9 +283,13 @@ export default function SettingsPage() {
                                 className="glass-input flex-1 px-3 py-2 text-sm"
                             />
                             <button
-                                disabled={deleteName !== SESSIONS.find(s => s.id === deleteConfirm)?.name}
-                                className={cn('btn-danger text-sm py-2 px-3', deleteName !== SESSIONS.find(s => s.id === deleteConfirm)?.name && 'opacity-40 cursor-not-allowed')}
-                                onClick={() => { setDeleteConfirm(null); setDeleteName(''); }}
+                                disabled={deleteName !== sessions.find(s => s.id === deleteConfirm)?.name}
+                                className={cn('btn-danger text-sm py-2 px-3', deleteName !== sessions.find(s => s.id === deleteConfirm)?.name && 'opacity-40 cursor-not-allowed')}
+                                onClick={() => {
+                                    removeSession(deleteConfirm);
+                                    setDeleteConfirm(null);
+                                    setDeleteName('');
+                                }}
                             >
                                 Delete
                             </button>
@@ -253,9 +297,13 @@ export default function SettingsPage() {
                         </div>
                     </div>
                 )}
-                <button className="btn-primary text-sm flex items-center gap-2">
+                <button
+                    onClick={() => setModalOpen(true)}
+                    className="btn-primary text-sm flex items-center gap-2"
+                >
                     <Plus size={14} /> Create New Session
                 </button>
+                <NewBRDModal open={modalOpen} onClose={() => setModalOpen(false)} />
             </SettingsCard>
 
             {/* S6-05 Database Status */}

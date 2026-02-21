@@ -12,10 +12,10 @@ export default function ProtectedRoute({ children }: { children: React.ReactNode
     const [isChecking, setIsChecking] = useState(true);
 
     useEffect(() => {
-        // Wait for hydration to complete
         if (hasHydrated) {
             if (!isAuthenticated) {
-                router.push('/login');
+                // Redirect unauthenticated users to home page
+                router.push('/');
             } else {
                 setIsChecking(false);
             }
@@ -25,10 +25,10 @@ export default function ProtectedRoute({ children }: { children: React.ReactNode
     // Show loading while hydrating or checking auth
     if (!hasHydrated || isChecking) {
         return (
-            <div className="min-h-screen bg-zinc-950 flex items-center justify-center">
+            <div className="min-h-screen flex items-center justify-center" style={{ background: 'var(--bg-base)' }}>
                 <div className="text-center">
-                    <Loader2 size={32} className="text-cyan-400 animate-spin mx-auto mb-4" />
-                    <p className="text-zinc-400">Loading...</p>
+                    <Loader2 size={28} className="text-zinc-400 animate-spin mx-auto mb-3" />
+                    <p className="text-zinc-600 text-sm">Loading...</p>
                 </div>
             </div>
         );
