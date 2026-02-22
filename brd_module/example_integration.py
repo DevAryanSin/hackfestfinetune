@@ -24,14 +24,14 @@ from pydantic import BaseModel
 from typing import Optional
 from io import BytesIO
 
-# Import BRD module functions (relative import - same directory)
-from main import (
+# Import BRD module functions using package-qualified imports.
+from brd_module.main import (
     run_full_pipeline,
     generate_brd,
     validate_brd_sections,
     export_markdown,
     export_pdf,
-    export_docx
+    export_docx,
 )
 
 app = FastAPI(title="BRD Generation API")
