@@ -18,9 +18,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     zlib1g-dev \
     && rm -rf /var/lib/apt/lists/*
 
-COPY requirements-full.txt .
+COPY requirements.txt .
 RUN pip install --upgrade pip \
-    && pip wheel --no-cache-dir --wheel-dir /build/wheels -r requirements-full.txt
+    && pip wheel --no-cache-dir --wheel-dir /build/wheels -r requirements.txt
 
 
 # ---------- Stage 2: Runtime ----------
@@ -53,8 +53,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 # Install pre-built wheels from the builder stage (no compiler needed)
 COPY --from=builder /build/wheels /tmp/wheels
-COPY requirements-full.txt .
-RUN pip install --no-cache-dir --find-links=/tmp/wheels -r requirements-full.txt \
+COPY requirements.txt .
+RUN pip install --no-cache-dir --find-links=/tmp/wheels -r requirements.txt \
     && rm -rf /tmp/wheels
 
 # ---------- Non-root user ----------
