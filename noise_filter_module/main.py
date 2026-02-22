@@ -20,14 +20,14 @@ from dotenv import load_dotenv
 _HERE = Path(__file__).parent
 load_dotenv(_HERE / ".env")
 
-from classifier import classify_chunks
-from enron_parser import parse_to_chunks
+from .classifier import classify_chunks
+from .enron_parser import parse_to_chunks
 
 # ---------------------------------------------------------------------------
 # Config
 # ---------------------------------------------------------------------------
 
-CSV_PATH = _HERE / "emails.csv" / "emails.csv"
+CSV_PATH = os.getenv("ENRON_CSV_PATH", _HERE / "emails.csv" / "emails.csv")
 N_EMAILS = 500  # number of emails to process in demo mode
 
 def print_confidence_distribution(classified):
@@ -128,7 +128,7 @@ def main():
     print(f"  → {len(unique_chunks)} unique chunks after content deduplication\n")
     chunks = unique_chunks
     # Initialize the database
-    from storage import init_db, store_chunks
+    from .storage import init_db, store_chunks
     init_db()
     print("AKS Database initialized.")
 

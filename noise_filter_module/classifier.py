@@ -37,8 +37,8 @@ def log_chunk_decision(chunk, path, label, confidence, reasoning):
         f"\n{'='*60}"
     )
 
-from prompts import build_classification_prompt, build_batch_classification_prompt, VALID_LABELS
-from schema import ClassifiedChunk, SignalLabel
+from .prompts import build_classification_prompt, build_batch_classification_prompt, VALID_LABELS
+from .schema import ClassifiedChunk, SignalLabel
 
 # ---------------------------------------------------------------------------
 # Heuristic rules (fast path — no API call needed)
