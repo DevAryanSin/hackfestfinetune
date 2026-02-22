@@ -1,54 +1,25 @@
-# Version control
 .git
 .gitignore
-
-# Python caches
+.vscode
+.idea
 __pycache__/
 *.pyc
 *.pyo
 *.pyd
-.Python
-
-# Virtual environments
-env/
-venv/
-.env
-.venv
-
-# Pip artifacts
-pip-log.txt
-pip-delete-this-directory.txt
-
-# Local databases and logs (rebuilt at runtime)
-*.db
 *.log
+*.db
+*.sqlite
+*.sqlite3
 
-# Documentation (not needed in the image)
-docs/
-*.md
-!requirements*.txt
+# Frontend artifacts
+frontend/node_modules/
+frontend/.next/
+frontend/out/
 
-# Frontend (served separately)
-frontend/
+# Local environment files
+.env
+**/.env
 
-# IDE / editor
-.pytest_cache/
-.vscode/
-.idea/
-.toast
-.lucid
-
-# Docker / Compose (avoid recursive build context issues)
-Dockerfile
-docker-compose.yml
-podman-compose.yml
-.dockerignore
-
-# Misc dev artifacts
-test_output*
-git_status_out.txt
-bash_history
-run_tests.py
-start-backend.*
-ps21-brd-agent/
-brd Module/
+# OS junk
+.DS_Store
+Thumbs.db

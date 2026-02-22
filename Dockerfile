@@ -1,35 +1,10 @@
-FROM python:3.11-slim AS builder
-
-ENV PYTHONDONTWRITEBYTECODE=1 \
-    PYTHONUNBUFFERED=1 \
-    PIP_NO_CACHE_DIR=1
-
-WORKDIR /build
-
-# Build deps required for wheels (psycopg2, some native libs)
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    build-essential \
-    gcc \
-    libpq-dev \
-    libffi-dev \
-    libxml2-dev \
-    libxslt1-dev \
-    libjpeg62-turbo-dev \
-    zlib1g-dev \
-    && rm -rf /var/lib/apt/lists/*
-
-COPY requirements-docker.txt .
-RUN python -m pip install --upgrade pip setuptools wheel \
-    && python -m pip wheel --wheel-dir /wheels -r requirements-docker.txt
-
-
 FROM python:3.11-slim AS runtime
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     PIP_NO_CACHE_DIR=1 \
     PORT=8080 \
-    WEB_CONCURRENCY=2
+    WEB_CONCURRENCY=1
 
 WORKDIR /app
 
@@ -50,16 +25,27 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     curl \
     && rm -rf /var/lib/apt/lists/*
 
-COPY requirements-docker.txt .
-COPY --from=builder /wheels /wheels
-RUN python -m pip install --upgrade pip \
-    && python -m pip install --no-index --find-links=/wheels -r requirements-docker.txt \
-    && rm -rf /wheels
-
 COPY . .
 
-# Ensure package dirs are explicit Python packages
-RUN touch brd_module/__init__.py integration_module/__init__.py noise_filter_module/__init__.py
+# Install dependencies from whichever context was used:
+# 1) repo root build context with Dockerfile at HackfestFinetuners/Dockerfile
+# 2) build context already set to HackfestFinetuners/
+RUN python -m pip install --upgrade pip \
+    && if [ -f /app/requirements.txt ]; then \
+        python -m pip install -r /app/requirements.txt; \
+    elif [ -f /app/HackfestFinetuners/requirements.txt ]; then \
+        python -m pip install -r /app/HackfestFinetuners/requirements.txt; \
+    else \
+        echo "requirements.txt not found in expected locations" && exit 1; \
+    fi
+
+# Ensure package dirs are explicit Python packages (both context layouts).
+RUN if [ -d /app/brd_module ]; then \
+      touch /app/brd_module/__init__.py /app/integration_module/__init__.py /app/noise_filter_module/__init__.py; \
+    fi \
+    && if [ -d /app/HackfestFinetuners/brd_module ]; then \
+      touch /app/HackfestFinetuners/brd_module/__init__.py /app/HackfestFinetuners/integration_module/__init__.py /app/HackfestFinetuners/noise_filter_module/__init__.py; \
+    fi
 
 # Least privilege runtime user
 RUN useradd -m -u 10001 appuser && chown -R appuser:appuser /app
@@ -71,4 +57,4 @@ EXPOSE 8080
 HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \
     CMD curl -fsS "http://127.0.0.1:${PORT:-8080}/" || exit 1
 
-CMD ["sh", "-c", "exec gunicorn api.main:app -k uvicorn.workers.UvicornWorker --bind 0.0.0.0:${PORT:-8080} --workers ${WEB_CONCURRENCY:-2} --threads 2 --timeout 0 --graceful-timeout 30 --access-logfile - --error-logfile -"]
+CMD ["sh", "-c", "if [ -d /app/HackfestFinetuners/api ]; then cd /app/HackfestFinetuners; fi; exec gunicorn api.main:app -k uvicorn.workers.UvicornWorker --bind 0.0.0.0:${PORT:-8080} --workers ${WEB_CONCURRENCY:-1} --threads 2 --timeout 0 --graceful-timeout 30 --access-logfile - --error-logfile -"]
