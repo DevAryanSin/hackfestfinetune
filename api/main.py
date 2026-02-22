@@ -7,9 +7,32 @@ import sys
 # Add the parent directory and nested modules so we can import them
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from .routers import sessions, ingest, review, brd
-from integration_module.routes import gmail_routes, slack_routes, pdf_routes
+from .routers import sessions
 from brd_module.storage import init_db
+
+OPTIONAL_APP_ROUTERS = []
+for module_path in (
+    "api.routers.ingest",
+    "api.routers.review",
+    "api.routers.brd",
+):
+    try:
+        module = __import__(module_path, fromlist=["router"])
+        OPTIONAL_APP_ROUTERS.append(module.router)
+    except ModuleNotFoundError as e:
+        print(f"WARNING: Skipping optional router '{module_path}': {e}")
+
+OPTIONAL_INTEGRATION_ROUTERS = []
+for module_path in (
+    "integration_module.routes.gmail_routes",
+    "integration_module.routes.slack_routes",
+    "integration_module.routes.pdf_routes",
+):
+    try:
+        module = __import__(module_path, fromlist=["router"])
+        OPTIONAL_INTEGRATION_ROUTERS.append(module.router)
+    except ModuleNotFoundError as e:
+        print(f"WARNING: Skipping optional router '{module_path}': {e}")
 
 
 @asynccontextmanager
@@ -45,12 +68,10 @@ app.add_middleware(
 )
 
 app.include_router(sessions.router)
-app.include_router(ingest.router)
-app.include_router(review.router)
-app.include_router(brd.router)
-app.include_router(gmail_routes.router)
-app.include_router(slack_routes.router)
-app.include_router(pdf_routes.router)
+for optional_router in OPTIONAL_APP_ROUTERS:
+    app.include_router(optional_router)
+for optional_router in OPTIONAL_INTEGRATION_ROUTERS:
+    app.include_router(optional_router)
 
 @app.get("/")
 def read_root():

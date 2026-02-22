@@ -1,15 +1,15 @@
-# ============================================================
-#  BRD Generation API – Production Dockerfile (GCP Cloud Run)
-# ============================================================
-
-# ---------- Stage 1: Build ----------
 FROM python:3.11-slim AS builder
+
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    PIP_NO_CACHE_DIR=1
 
 WORKDIR /build
 
-# Install only the build-time system libs needed to compile wheels
+# Build deps required for wheels (psycopg2, some native libs)
 RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential \
+    gcc \
     libpq-dev \
     libffi-dev \
     libxml2-dev \
@@ -18,78 +18,57 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     zlib1g-dev \
     && rm -rf /var/lib/apt/lists/*
 
-COPY requirements.txt .
-RUN pip install --upgrade pip \
-    && pip wheel --no-cache-dir --wheel-dir /build/wheels -r requirements.txt
+COPY requirements-docker.txt .
+RUN python -m pip install --upgrade pip setuptools wheel \
+    && python -m pip wheel --wheel-dir /wheels -r requirements-docker.txt
 
 
-# ---------- Stage 2: Runtime ----------
-FROM python:3.11-slim
+FROM python:3.11-slim AS runtime
 
-# ---------- Environment ----------
-ENV PYTHONUNBUFFERED=1 \
-    PYTHONDONTWRITEBYTECODE=1 \
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    PIP_NO_CACHE_DIR=1 \
     PORT=8080 \
-    # Keeps signal handling sane inside containers
-    PYTHONFAULTHANDLER=1
+    WEB_CONCURRENCY=2
 
 WORKDIR /app
 
-# Install only runtime system libraries (no build toolchain)
+# Runtime system libs for psycopg2 + weasyprint + pymupdf/docx rendering stack
 RUN apt-get update && apt-get install -y --no-install-recommends \
     libpq5 \
+    libcairo2 \
     libpango-1.0-0 \
-    libpangoft2-1.0-0 \
-    libharfbuzz0b \
     libpangocairo-1.0-0 \
-    libgdk-pixbuf-xlib-2.0-0 \
-    shared-mime-info \
+    libgdk-pixbuf-2.0-0 \
+    libffi8 \
     libxml2 \
     libxslt1.1 \
     libjpeg62-turbo \
     zlib1g \
+    shared-mime-info \
+    fonts-dejavu-core \
     curl \
     && rm -rf /var/lib/apt/lists/*
 
-# Install pre-built wheels from the builder stage (no compiler needed)
-COPY --from=builder /build/wheels /tmp/wheels
-COPY requirements.txt .
-RUN pip install --no-cache-dir --find-links=/tmp/wheels -r requirements.txt \
-    && rm -rf /tmp/wheels
+COPY requirements-docker.txt .
+COPY --from=builder /wheels /wheels
+RUN python -m pip install --upgrade pip \
+    && python -m pip install --no-index --find-links=/wheels -r requirements-docker.txt \
+    && rm -rf /wheels
 
-# ---------- Non-root user ----------
-RUN groupadd -r appuser && useradd -r -g appuser -d /app -s /sbin/nologin appuser
-
-# ---------- Copy Application ----------
 COPY . .
 
-# Ensure all Python packages are importable
-RUN touch brd_module/__init__.py integration_module/__init__.py noise_filter_module/__init__.py 2>/dev/null || true
+# Ensure package dirs are explicit Python packages
+RUN touch brd_module/__init__.py integration_module/__init__.py noise_filter_module/__init__.py
 
-# Own the workdir
-RUN chown -R appuser:appuser /app
-
+# Least privilege runtime user
+RUN useradd -m -u 10001 appuser && chown -R appuser:appuser /app
 USER appuser
 
-# ---------- Health Check ----------
-HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
-    CMD curl -f http://localhost:${PORT}/ || exit 1
+# Cloud Run listens on $PORT; we expose 8080 as the canonical container port.
+EXPOSE 8080
 
-# Cloud Run provides PORT; default to 8080
-EXPOSE ${PORT}
+HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \
+    CMD curl -fsS "http://127.0.0.1:${PORT:-8080}/" || exit 1
 
-# ---------- Production Server ----------
-# 'exec' form ensures gunicorn is PID 1 and receives SIGTERM from Cloud Run.
-# --preload: validate imports at startup so failures surface immediately.
-# --timeout 0:  Cloud Run manages request timeouts externally.
-# --graceful-timeout 30: allows in-flight requests to finish on shutdown.
-CMD exec gunicorn api.main:app \
-    -k uvicorn.workers.UvicornWorker \
-    --bind 0.0.0.0:${PORT} \
-    --workers 2 \
-    --threads 2 \
-    --timeout 0 \
-    --graceful-timeout 30 \
-    --preload \
-    --access-logfile - \
-    --error-logfile -
+CMD ["sh", "-c", "exec gunicorn api.main:app -k uvicorn.workers.UvicornWorker --bind 0.0.0.0:${PORT:-8080} --workers ${WEB_CONCURRENCY:-2} --threads 2 --timeout 0 --graceful-timeout 30 --access-logfile - --error-logfile -"]

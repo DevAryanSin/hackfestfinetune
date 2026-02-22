@@ -8,11 +8,10 @@ from typing import List
 
 PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 sys.path.append(PROJECT_ROOT)
-sys.path.append(os.path.join(PROJECT_ROOT, "noise_filter_module"))
 
 from brd_module.storage import store_chunks
-from storage import copy_session_chunks
-from classifier import classify_chunks
+from noise_filter_module.storage import copy_session_chunks
+from noise_filter_module.classifier import classify_chunks
 
 # Session ID of the pre-classified 300-email Enron demo cache
 DEMO_CACHE_SESSION_ID = os.environ.get("DEMO_CACHE_SESSION_ID", "default_session")
@@ -164,7 +163,7 @@ async def ingest_demo_dataset(session_id: str, limit: int = 80):
             classified = classify_chunks(chunk_dicts, api_key=api_key, log_fn=log)
             for c in classified:
                 c.session_id = session_id
-            from storage import store_chunks as _store
+            from noise_filter_module.storage import store_chunks as _store
             _store(classified)
             log(f"[DEMO INGEST] {'─'*60}")
             log(f"[DEMO INGEST] ✅ Complete! {len(classified)} chunks stored for session '{session_id}'.")

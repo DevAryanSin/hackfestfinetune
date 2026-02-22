@@ -2,6 +2,9 @@
 # Consolidated Requirements for BRD Generation System
 # ============================================================
 
+# For containerized deployments, use requirements-docker.txt
+# (kept separate for reproducible Docker builds).
+
 # --- Core & Database ---
 psycopg2-binary>=2.9.0
 python-dotenv>=0.19.0

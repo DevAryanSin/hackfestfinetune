@@ -10,7 +10,15 @@ from datetime import datetime, timezone
 
 from dotenv import load_dotenv
 from pathlib import Path
-from groq import Groq
+try:
+    from groq import Groq
+except ModuleNotFoundError:
+    class Groq:  # type: ignore[no-redef]
+        def __init__(self, *args, **kwargs):
+            raise RuntimeError(
+                "groq package is not installed. Install it (pip install groq) "
+                "to enable BRD validation."
+            )
 
 _HERE = Path(__file__).parent
 load_dotenv(_HERE / ".env")

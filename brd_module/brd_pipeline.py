@@ -16,7 +16,24 @@ from pathlib import Path
 _HERE = Path(__file__).parent
 load_dotenv(_HERE / ".env")
 
-from groq import Groq, APIConnectionError, RateLimitError, APIStatusError
+try:
+    from groq import Groq, APIConnectionError, RateLimitError, APIStatusError
+except ModuleNotFoundError:
+    class APIConnectionError(Exception):
+        pass
+
+    class RateLimitError(Exception):
+        pass
+
+    class APIStatusError(Exception):
+        pass
+
+    class Groq:  # type: ignore[no-redef]
+        def __init__(self, *args, **kwargs):
+            raise RuntimeError(
+                "groq package is not installed. Install it (pip install groq) "
+                "to enable BRD generation."
+            )
 from brd_module.storage import create_snapshot, get_signals_for_snapshot, store_brd_section
 
 def call_llm_with_retry(client: Groq, messages: List[Dict[str, str]], json_mode: bool = False, max_tokens: int = 2048) -> str:

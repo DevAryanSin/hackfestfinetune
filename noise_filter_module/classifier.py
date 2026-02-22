@@ -13,10 +13,25 @@ import re
 import time
 import logging
 import threading
-from typing import Optional
+from typing import Optional, Any
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
-from groq import Groq, APIConnectionError, RateLimitError, APIStatusError
+try:
+    from groq import Groq, APIConnectionError, RateLimitError, APIStatusError
+    GROQ_SDK_AVAILABLE = True
+except ModuleNotFoundError:
+    GROQ_SDK_AVAILABLE = False
+
+    class APIConnectionError(Exception):
+        pass
+
+    class RateLimitError(Exception):
+        pass
+
+    class APIStatusError(Exception):
+        pass
+
+    Groq = Any  # type: ignore[assignment]
 
 logging.basicConfig(
     filename="pipeline_debug.log",
@@ -376,7 +391,7 @@ def apply_confidence_threshold(result: dict) -> dict:
 # Main orchestrator
 # ---------------------------------------------------------------------------
 
-def classify_chunks(chunks: list[dict], api_key: str, log_fn=None) -> list[ClassifiedChunk]:
+def classify_chunks(chunks: list[dict], api_key: Optional[str] = None, log_fn=None) -> list[ClassifiedChunk]:
     """
     Two-phase parallel classification pipeline.
 
@@ -392,7 +407,6 @@ def classify_chunks(chunks: list[dict], api_key: str, log_fn=None) -> list[Class
     if not chunks:
         return []
 
-    client = Groq(api_key=api_key)
     total = len(chunks)
 
     # Shared thread-safe progress counter
@@ -417,7 +431,33 @@ def classify_chunks(chunks: list[dict], api_key: str, log_fn=None) -> list[Class
     # ── Phase 2: batch LLM calls ─────────────────────────────────────────────
     llm_results: dict[int, dict] = {}
     if llm_pending:
-        llm_results = run_parallel_batches(llm_pending, client, progress_callback)
+        if not GROQ_SDK_AVAILABLE:
+            print("  -> Groq SDK not installed; classifying LLM-pending chunks as noise.")
+            if log_fn:
+                log_fn("[CLASSIFIER] Groq SDK not installed; LLM-pending chunks were classified as noise.")
+            for idx, _ in llm_pending:
+                llm_results[idx] = {
+                    "label": "noise",
+                    "confidence": 0.0,
+                    "reasoning": "Groq SDK not installed in runtime environment.",
+                    "flagged_for_review": True,
+                }
+            progress_callback(len(llm_pending))
+        elif not api_key:
+            print("  -> GROQ_CLOUD_API not set; classifying LLM-pending chunks as noise.")
+            if log_fn:
+                log_fn("[CLASSIFIER] GROQ_CLOUD_API not set; LLM-pending chunks were classified as noise.")
+            for idx, _ in llm_pending:
+                llm_results[idx] = {
+                    "label": "noise",
+                    "confidence": 0.0,
+                    "reasoning": "GROQ_CLOUD_API is not configured.",
+                    "flagged_for_review": True,
+                }
+            progress_callback(len(llm_pending))
+        else:
+            client = Groq(api_key=api_key)
+            llm_results = run_parallel_batches(llm_pending, client, progress_callback)
 
     # ── Assemble in original order ────────────────────────────────────────────
     all_results = {**fast_results, **llm_results}
